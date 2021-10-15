@@ -3,7 +3,6 @@ from enum import Enum
 from gpiozero import LEDBoard
 from time import sleep
 import random
-from signal import pause
 import requests
 
 
@@ -14,10 +13,10 @@ class Color(Enum):
 
 
 class Answer(Enum):
-    A = 'a'
-    B = 'b'
-    C = 'c'
-    D = 'd'
+    a = 0
+    b = 1
+    c = 2
+    d = 3
 
 
 # Define variables
@@ -25,6 +24,10 @@ lights = LEDBoard(20, 21)  # R, G
 red = lights[0]
 green = lights[1]
 api_url = "https://opentdb.com/api.php?amount=10&category=18&difficulty=easy&type=multiple&encode=base64"
+
+questions = []
+answers = []
+correct_answers = []  # Enum Answer
 
 
 # Main function
@@ -57,22 +60,48 @@ def fetch(url):
 
 
 def display_questions(data):
-    questions = data.json()['results']
+    res = data.json()['results']
 
-    a = random.choice(list(Answer))
-    print(a)
+    for i, data in enumerate(res):
+        question = data['question']
+        # print(random.choice(list(Answer)))
+        incorrect_answers = data['incorrect_answers']
+        current_incorrect_answer = 0
+        correct_choice = random.choice(list(Answer))
 
-    # for q in questions:
-    #     print(base64_to_string(q['question']))
-    #     print("+ " + base64_to_string(q['correct_answer']))
-    #
-    #     for i_a in q['incorrect_answers']:
-    #         print("+ " + base64_to_string(i_a))
+        questions.append(question)
+        correct_answers.append(correct_choice)
+
+        answers[i][correct_choice.value] = data['correct_answer']
+
+        for j, a in enumerate(answers[i]):
+            if a == -1:
+                answers[i][j] = incorrect_answers[current_incorrect_answer]
+                current_incorrect_answer += 1
+
+
+def fill_answer():
+    for _ in range(0, 10):
+        answers.append([-1, -1, -1, -1])  # a, b, c, d
 
 
 # Helpers
 def base64_to_string(b):
     return base64.b64decode(b).decode('utf-8')
+
+
+def print_base64(b):
+    print(base64_to_string(b))
+
+
+def show_right_alert():
+    green.blink(.1, .1, 5, True)
+    print(">> You are right!")
+
+
+def show_wrong_alert():
+    red.blink(.5, .1, 2, True)
+    print(">> Oops!")
 
 
 # TODO: ask() get user answer
@@ -83,6 +112,22 @@ def base64_to_string(b):
 
 
 if __name__ == '__main__':
+    usr_answer = ''
+
+    fill_answer()
     main()
 
-pause()
+    for i, question in enumerate(questions):
+        print("{}{}".format((i + 1), ". "), end='')
+        print_base64(question)
+
+        for j, answer in enumerate(answers[i]):
+            print(Answer(j).name + ". ", end='')
+            print_base64(answer)
+
+        usr_answer = input("Enter your answer: ")
+
+        if usr_answer.lower() == correct_answers[i].name.lower():
+            show_right_alert()
+        else:
+            show_wrong_alert()
